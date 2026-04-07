@@ -1,25 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createOrderSchema } from "@/lib/validations";
+import { getClientIp, rateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
+import { resolveScopedSchoolId } from "@/lib/school-scope";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const limitResult = await rateLimit({
+    key: `orders:get:${session.user.id}:${getClientIp(req)}`,
+    limit: 120,
+    windowSec: 60,
+  });
+  if (!limitResult.success) {
+    return rateLimitExceededResponse("Too many order requests", limitResult);
+  }
+
   const { searchParams } = new URL(req.url);
-  const role = (session.user as any).role;
-  const userId = (session.user as any).id;
+  const role = session.user.role;
+  const userId = session.user.id;
   const teacherId = searchParams.get("teacherId");
+  const requestedSchoolId = searchParams.get("schoolId");
   const date = searchParams.get("date");
   const month = searchParams.get("month");
 
-  const where: any = {};
+  const where: Prisma.OrderWhereInput = {};
 
   if (role === "PARENT") {
     where.parentId = userId;
-  } else if (role === "TEACHER") {
-    where.teacherId = (session.user as any).teacherId;
+  } else if (role === "TEACHER" && session.user.teacherId) {
+    where.teacherId = session.user.teacherId;
+  } else if (role === "ADMIN") {
+    const schoolId = await resolveScopedSchoolId({
+      role,
+      userId,
+      requestedSchoolId,
+    });
+
+    if (!schoolId) {
+      return NextResponse.json({ error: "School scope required" }, { status: 400 });
+    }
+
+    where.teacher = { schoolId };
   }
 
   if (teacherId && (role === "ADMIN")) {
@@ -58,19 +84,74 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.user.role !== "PARENT") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
-  const body = await req.json();
-  const { childId, teacherId, deliveryDate, items, notes } = body;
-  const parentId = (session.user as any).id;
-
-  const school = await prisma.school.findFirst({ include: { settings: true } });
-  const taxRate = school?.settings?.taxRate ?? 0;
-
-  const menuItems = await prisma.menuItem.findMany({
-    where: { id: { in: items.map((i: any) => i.menuItemId) } },
+  const limitResult = await rateLimit({
+    key: `orders:create:${session.user.id}:${getClientIp(req)}`,
+    limit: 20,
+    windowSec: 60,
   });
 
-  const subtotalCents = items.reduce((sum: number, item: any) => {
+  if (!limitResult.success) {
+    return rateLimitExceededResponse("Too many order attempts", limitResult);
+  }
+
+  const parsed = createOrderSchema.safeParse(await req.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid order payload" }, { status: 422 });
+  }
+
+  const { childId, teacherId, deliveryDate, items, notes } = parsed.data;
+  const parentId = session.user.id;
+
+  const child = await prisma.child.findFirst({
+    where: { id: childId, parentId },
+    select: {
+      id: true,
+      teacherId: true,
+      teacher: {
+        select: { schoolId: true, isActive: true },
+      },
+    },
+  });
+  if (!child) {
+    return NextResponse.json({ error: "Child not found" }, { status: 404 });
+  }
+
+  if (child.teacherId !== teacherId) {
+    return NextResponse.json({ error: "Invalid teacher for child" }, { status: 400 });
+  }
+
+  if (!child.teacher.isActive) {
+    return NextResponse.json({ error: "Teacher is not active" }, { status: 400 });
+  }
+
+  const parsedDeliveryDate = new Date(deliveryDate);
+  if (Number.isNaN(parsedDeliveryDate.getTime())) {
+    return NextResponse.json({ error: "Invalid delivery date" }, { status: 422 });
+  }
+
+  const schoolSettings = await prisma.schoolSettings.findUnique({
+    where: { schoolId: child.teacher.schoolId },
+    select: { taxRate: true },
+  });
+  const taxRate = schoolSettings?.taxRate ?? 0;
+
+  const menuItems = await prisma.menuItem.findMany({
+    where: {
+      id: { in: items.map((i) => i.menuItemId) },
+      schoolId: child.teacher.schoolId,
+      isAvailable: true,
+    },
+  });
+
+  if (menuItems.length !== items.length) {
+    return NextResponse.json({ error: "One or more menu items are invalid" }, { status: 400 });
+  }
+
+  const subtotalCents = items.reduce((sum: number, item) => {
     const menuItem = menuItems.find((m) => m.id === item.menuItemId);
     return sum + (menuItem?.price ?? 0) * item.quantity;
   }, 0);
@@ -83,14 +164,14 @@ export async function POST(req: NextRequest) {
       parentId,
       childId,
       teacherId,
-      deliveryDate: new Date(deliveryDate),
+      deliveryDate: parsedDeliveryDate,
       status: "PENDING",
       subtotalCents,
       taxCents,
       totalCents,
       notes,
       items: {
-        create: items.map((item: any) => {
+        create: items.map((item) => {
           const menuItem = menuItems.find((m) => m.id === item.menuItemId)!;
           return {
             menuItemId: item.menuItemId,

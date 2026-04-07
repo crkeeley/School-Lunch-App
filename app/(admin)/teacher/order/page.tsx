@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -14,7 +13,6 @@ interface MenuItem {
 }
 
 export default function TeacherOrderPage() {
-  const { data: session } = useSession();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [deliveryDate, setDeliveryDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -30,8 +28,11 @@ export default function TeacherOrderPage() {
   }
   function updateQty(itemId: string, qty: number) {
     if (qty <= 0) {
-      const { [itemId]: _, ...rest } = cart;
-      setCart(rest);
+      setCart((prev) => {
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
+      });
     } else {
       setCart((prev) => ({ ...prev, [itemId]: qty }));
     }

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 
 interface Order {

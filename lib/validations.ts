@@ -35,6 +35,31 @@ export const recurringRuleSchema = z.object({
   items: z.array(orderItemSchema).min(1),
 });
 
+export const childSchema = z.object({
+  teacherId: z.string().min(1),
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  allergies: z.string().max(1000).optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+export const teacherOrderSchema = z.object({
+  deliveryDate: z.string(),
+  notes: z.string().max(2000).optional(),
+  items: z.array(orderItemSchema).min(1, "Please add at least one item"),
+  schoolId: z.string().min(1).optional(),
+});
+
+export const teacherCreateSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  grade: z.string().max(50).optional(),
+  roomNumber: z.string().max(50).optional(),
+  password: z.string().min(12, "Password must be at least 12 characters"),
+  schoolId: z.string().min(1).optional(),
+});
+
 export const menuItemSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
@@ -43,4 +68,5 @@ export const menuItemSchema = z.object({
   imageUrl: z.string().url().optional().or(z.literal("")),
   isAvailable: z.boolean().default(true),
   isFamilySize: z.boolean().default(false),
+  schoolId: z.string().min(1).optional(),
 });

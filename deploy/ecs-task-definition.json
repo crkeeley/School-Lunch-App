@@ -1,0 +1,49 @@
+{
+  "family": "school-lunch-app",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::<account-id>:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::<account-id>:role/school-lunch-app-task-role",
+  "containerDefinitions": [
+    {
+      "name": "school-lunch-app",
+      "image": "<account-id>.dkr.ecr.<region>.amazonaws.com/school-lunch-app:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "NEXTAUTH_URL", "value": "https://app.example.com" }
+      ],
+      "secrets": [
+        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:school-lunch-app/database-url" },
+        { "name": "NEXTAUTH_SECRET", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:school-lunch-app/nextauth-secret" },
+        { "name": "STRIPE_SECRET_KEY", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:school-lunch-app/stripe-secret" },
+        { "name": "STRIPE_WEBHOOK_SECRET", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:school-lunch-app/stripe-webhook-secret" },
+        { "name": "RESEND_API_KEY", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:school-lunch-app/resend-api-key" },
+        { "name": "REDIS_URL", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:school-lunch-app/redis-url" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/school-lunch-app",
+          "awslogs-region": "<region>",
+          "awslogs-stream-prefix": "web"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      }
+    }
+  ]
+}

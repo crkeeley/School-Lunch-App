@@ -2,6 +2,15 @@ import { Resend } from "resend";
 
 export const resend = new Resend(process.env.RESEND_API_KEY);
 
+function requireFromEmail() {
+  const fromEmail = process.env.FROM_EMAIL;
+  if (!fromEmail) {
+    throw new Error("FROM_EMAIL environment variable is required");
+  }
+
+  return fromEmail;
+}
+
 export async function sendOrderConfirmation({
   to,
   parentName,
@@ -26,7 +35,7 @@ export async function sendOrderConfirmation({
     .join("");
 
   await resend.emails.send({
-    from: process.env.FROM_EMAIL ?? "noreply@schoollunch.com",
+    from: requireFromEmail(),
     to,
     subject: `Order Confirmed - ${deliveryDate}`,
     html: `
@@ -57,22 +66,26 @@ export async function sendOrderConfirmation({
   });
 }
 
-export async function sendWelcomeEmail({
+export async function sendVerificationEmail({
   to,
   name,
+  verifyUrl,
 }: {
   to: string;
   name: string;
+  verifyUrl: string;
 }) {
   await resend.emails.send({
-    from: process.env.FROM_EMAIL ?? "noreply@schoollunch.com",
+    from: requireFromEmail(),
     to,
-    subject: "Welcome to School Lunch Ordering!",
+    subject: "Verify your email – School Lunch Ordering",
     html: `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #16a34a;">Welcome, ${name}!</h1>
-        <p>Your account has been created. You can now start ordering school lunches for your child.</p>
-        <a href="${process.env.NEXTAUTH_URL}/dashboard" style="background:#16a34a;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;margin-top:16px;">Go to Dashboard</a>
+        <h1 style="color: #16a34a;">Almost there, ${name}!</h1>
+        <p>Thanks for creating an account. Please verify your email address to activate your account and start ordering lunches for your child.</p>
+        <a href="${verifyUrl}" style="background:#16a34a;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;margin-top:16px;">Verify Email Address</a>
+        <p style="color:#6b7280;font-size:13px;margin-top:24px;">This link expires in 24 hours. If you did not create an account, you can safely ignore this email.</p>
+        <p style="color:#9ca3af;font-size:11px;">If the button above does not work, copy and paste this URL into your browser:<br/>${verifyUrl}</p>
       </div>
     `,
   });

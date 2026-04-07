@@ -1,10 +1,11 @@
 "use client";
+import Image from "next/image";
 import { useCartStore } from "@/lib/cart-store";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, deliveryDate, childName, teacherName, getTotal, clearCart } = useCartStore();
+  const { items, removeItem, updateQuantity, deliveryDate, childName, teacherName, getTotal } = useCartStore();
   const router = useRouter();
   const total = getTotal();
 
@@ -45,7 +46,7 @@ export default function CartPage() {
           <div key={item.menuItemId} className="flex items-center gap-4 p-4 border-b border-gray-100 last:border-b-0">
             <div className="text-2xl">
               {item.imageUrl ? (
-                <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-lg object-cover" />
+                <Image src={item.imageUrl} alt={item.name} width={48} height={48} className="w-12 h-12 rounded-lg object-cover" />
               ) : "🍽️"}
             </div>
             <div className="flex-1">

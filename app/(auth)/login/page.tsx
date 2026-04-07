@@ -1,7 +1,8 @@
 "use client";
+import { Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema } from "@/lib/validations";
@@ -10,12 +11,25 @@ import { z } from "zod";
 
 type LoginForm = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const verified = searchParams.get("verified") === "1";
+  const tokenExpired = searchParams.get("error") === "invalid_token";
+  const hasLeakedCredentials = searchParams.has("email") || searchParams.has("password");
+
   const [error, setError] = useState("");
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   });
+
+  useEffect(() => {
+    if (!hasLeakedCredentials) {
+      return;
+    }
+
+    router.replace("/login");
+  }, [hasLeakedCredentials, router]);
 
   async function onSubmit(data: LoginForm) {
     setError("");
@@ -25,12 +39,15 @@ export default function LoginPage() {
       redirect: false,
     });
 
+    if (result?.error === "EmailNotVerified") {
+      setError("Please verify your email before signing in. Check your inbox for the verification link.");
+      return;
+    }
     if (result?.error) {
       setError("Invalid email or password");
       return;
     }
 
-    // Redirect based on role
     const res = await fetch("/api/auth/session");
     const session = await res.json();
     const role = session?.user?.role;
@@ -40,48 +57,84 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Welcome back</h2>
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
+    <div className="bg-white rounded-3xl shadow-xl border-2 border-orange-100 p-8">
+      <h2 className="text-2xl font-black text-gray-900 mb-1">Welcome back!</h2>
+      <p className="text-gray-500 font-medium mb-6 text-sm">Sign in to manage your child&apos;s lunches</p>
+
+      {verified && (
+        <div className="mb-5 p-3 bg-green-50 border-2 border-green-200 rounded-2xl text-green-700 text-sm font-semibold flex items-center gap-2">
+          <span>✅</span> Email verified! You can now sign in.
         </div>
       )}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+
+      {tokenExpired && (
+        <div className="mb-5 p-3 bg-yellow-50 border-2 border-yellow-200 rounded-2xl text-yellow-700 text-sm font-semibold flex items-center gap-2">
+          <span>⚠️</span> This verification link is invalid or has expired. Please register again.
+        </div>
+      )}
+
+      {hasLeakedCredentials && (
+        <div className="mb-5 p-3 bg-yellow-50 border-2 border-yellow-200 rounded-2xl text-yellow-700 text-sm font-semibold flex items-center gap-2">
+          <span>⚠️</span> Login form submitted before app was ready. Please try signing in again.
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-5 p-3 bg-red-50 border-2 border-red-200 rounded-2xl text-red-600 text-sm font-semibold flex items-center gap-2">
+          <span>⚠️</span> {error}
+        </div>
+      )}
+
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleSubmit(onSubmit)(event);
+        }}
+        className="space-y-4"
+      >
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <label className="block text-sm font-bold text-gray-700 mb-1.5">Email address</label>
           <input
             {...register("email")}
             type="email"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="w-full border-2 border-gray-200 rounded-2xl px-4 py-3 font-medium focus:outline-none focus:border-orange-400 transition-colors"
             placeholder="you@example.com"
           />
-          {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+          {errors.email && <p className="text-red-500 text-xs mt-1.5 font-semibold">{errors.email.message}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <label className="block text-sm font-bold text-gray-700 mb-1.5">Password</label>
           <input
             {...register("password")}
             type="password"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="w-full border-2 border-gray-200 rounded-2xl px-4 py-3 font-medium focus:outline-none focus:border-orange-400 transition-colors"
             placeholder="••••••••"
           />
-          {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
+          {errors.password && <p className="text-red-500 text-xs mt-1.5 font-semibold">{errors.password.message}</p>}
         </div>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full bg-green-600 text-white py-2.5 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50"
+          className="btn-bounce w-full bg-orange-500 text-white py-3.5 rounded-2xl font-black text-lg shadow-lg shadow-orange-200 hover:bg-orange-600 transition-colors disabled:opacity-50 mt-2"
         >
           {isSubmitting ? "Signing in..." : "Sign In"}
         </button>
       </form>
-      <p className="text-center text-sm text-gray-600 mt-6">
-        Don't have an account?{" "}
-        <Link href="/register" className="text-green-600 font-medium hover:underline">
-          Sign up
+
+      <p className="text-center text-sm text-gray-500 font-medium mt-6">
+        Don&apos;t have an account?{" "}
+        <Link href="/register" className="text-orange-500 font-black hover:underline">
+          Sign up free
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

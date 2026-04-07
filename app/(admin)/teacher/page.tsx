@@ -1,14 +1,29 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 
+interface OrderItem {
+  quantity: number;
+  menuItem: { name: string };
+}
+
+interface StudentOrder {
+  id: string;
+  totalCents: number;
+  child: { firstName: string; lastName: string };
+  items: OrderItem[];
+}
+
+interface TeacherGroup {
+  teacher: { id: string; firstName: string; lastName: string };
+  orders: StudentOrder[];
+}
+
 export default function TeacherDashboard() {
-  const { data: session } = useSession();
   const today = format(new Date(), "yyyy-MM-dd");
-  const [groups, setGroups] = useState<any[]>([]);
+  const [groups, setGroups] = useState<TeacherGroup[]>([]);
 
   useEffect(() => {
     fetch(`/api/reports/by-teacher?date=${today}`)
@@ -61,13 +76,13 @@ export default function TeacherDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {myClass.orders.map((order: any) => (
+              {myClass.orders.map((order) => (
                 <tr key={order.id}>
                   <td className="px-4 py-3 font-medium">
                     {order.child.firstName} {order.child.lastName}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
-                    {order.items.map((i: any) => `${i.menuItem.name} ×${i.quantity}`).join(", ")}
+                    {order.items.map((i) => `${i.menuItem.name} ×${i.quantity}`).join(", ")}
                   </td>
                   <td className="px-4 py-3 font-semibold">{formatCurrency(order.totalCents)}</td>
                 </tr>

@@ -4,38 +4,38 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 
-interface Teacher {
+interface Order {
   id: string;
-  firstName: string;
-  lastName: string;
-  grade?: string;
-  orders: { id: string }[];
+  totalCents: number;
+  child: { firstName: string; lastName: string };
+  items: { quantity: number; menuItem: { name: string } }[];
+}
+
+interface TeacherGroup {
+  teacher: { id: string; firstName: string; lastName: string; grade?: string };
+  orders: Order[];
 }
 
 export default function AdminDashboard() {
   const today = format(new Date(), "yyyy-MM-dd");
-  const [groups, setGroups] = useState<any[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [groups, setGroups] = useState<TeacherGroup[]>([]);
 
   useEffect(() => {
     fetch(`/api/reports/by-teacher?date=${today}`)
       .then((r) => r.json())
       .then(setGroups);
-    fetch("/api/teachers")
-      .then((r) => r.json())
-      .then(setTeachers);
-  }, []);
+  }, [today]);
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-      <p className="text-gray-600 mb-6">Today's lunch orders — {format(new Date(), "EEEE, MMMM d, yyyy")}</p>
+      <p className="text-gray-600 mb-6">Today&apos;s lunch orders — {format(new Date(), "EEEE, MMMM d, yyyy")}</p>
 
       <div className="grid grid-cols-3 gap-5 mb-8">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
           <p className="text-gray-500 text-sm">Total Orders Today</p>
           <p className="text-3xl font-bold text-gray-900 mt-1">
-            {groups.reduce((sum: number, g: any) => sum + g.orders.length, 0)}
+            {groups.reduce((sum, g) => sum + g.orders.length, 0)}
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
@@ -45,8 +45,8 @@ export default function AdminDashboard() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
           <p className="text-gray-500 text-sm">Revenue Today</p>
           <p className="text-3xl font-bold text-green-700 mt-1">
-            {formatCurrency(groups.reduce((sum: number, g: any) =>
-              sum + g.orders.reduce((s: number, o: any) => s + o.totalCents, 0), 0)
+            {formatCurrency(groups.reduce((sum, g) =>
+              sum + g.orders.reduce((s, o) => s + o.totalCents, 0), 0)
             )}
           </p>
         </div>
@@ -68,7 +68,7 @@ export default function AdminDashboard() {
         </div>
       ) : (
         <div className="space-y-4">
-          {groups.map((group: any) => (
+          {groups.map((group) => (
             <div key={group.teacher.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="flex justify-between items-center p-4 border-b border-gray-100">
                 <div>
@@ -94,14 +94,14 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="divide-y divide-gray-50">
-                {group.orders.map((order: any) => (
+                {group.orders.map((order) => (
                   <div key={order.id} className="px-4 py-3 flex justify-between items-center">
                     <div>
                       <p className="font-medium text-sm text-gray-900">
                         {order.child.firstName} {order.child.lastName}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {order.items.map((i: any) => `${i.menuItem.name} ×${i.quantity}`).join(", ")}
+                        {order.items.map((i) => `${i.menuItem.name} ×${i.quantity}`).join(", ")}
                       </p>
                     </div>
                     <span className="text-sm font-semibold text-gray-700">{formatCurrency(order.totalCents)}</span>

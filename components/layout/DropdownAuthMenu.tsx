@@ -42,7 +42,7 @@ export function DropdownAuthMenu() {
     );
   }
 
-  const role = (session.user as any).role;
+  const role = session.user.role;
 
   return (
     <div className="relative" ref={ref}>

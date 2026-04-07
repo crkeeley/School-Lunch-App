@@ -78,7 +78,7 @@ export default function AccountPage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
         <h2 className="font-semibold text-gray-800 mb-3">Saved Payment Methods</h2>
         {cards.length === 0 ? (
-          <p className="text-gray-500 text-sm">No saved cards. Check "Save card" at checkout to save one.</p>
+          <p className="text-gray-500 text-sm">No saved cards. Check &quot;Save card&quot; at checkout to save one.</p>
         ) : (
           <div className="space-y-3">
             {cards.map((card) => (

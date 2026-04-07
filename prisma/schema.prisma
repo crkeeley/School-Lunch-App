@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -19,14 +19,27 @@ model User {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  children      Child[]
-  orders        Order[]
-  teacher       Teacher?
-  teacherOrders TeacherOrder[]
+  accounts                  Account[]
+  sessions                  Session[]
+  children                  Child[]
+  orders                    Order[]
+  teacher                   Teacher?
+  teacherOrders             TeacherOrder[]
+  emailVerificationTokens   EmailVerificationToken[]
 
   @@map("users")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verification_tokens")
 }
 
 model Account {
@@ -82,6 +95,7 @@ model School {
   menuItems MenuItem[]
   settings  SchoolSettings?
 
+  @@index([name])
   @@map("schools")
 }
 
@@ -114,6 +128,8 @@ model Teacher {
   children Child[]
   orders   Order[]
 
+  @@index([schoolId, isActive])
+  @@index([schoolId, lastName])
   @@map("teachers")
 }
 
@@ -133,6 +149,8 @@ model Child {
   orders         Order[]
   recurringRules RecurringOrderRule[]
 
+  @@index([parentId])
+  @@index([teacherId])
   @@map("children")
 }
 
@@ -155,6 +173,7 @@ model MenuItem {
   teacherOrderItems  TeacherOrderItem[]
   recurringRuleItems RecurringOrderRuleItem[]
 
+  @@index([schoolId, isAvailable, category])
   @@map("menu_items")
 }
 
@@ -185,6 +204,8 @@ model Order {
   @@index([deliveryDate])
   @@index([teacherId, deliveryDate])
   @@index([parentId])
+  @@index([parentId, deliveryDate])
+  @@index([status, deliveryDate])
   @@map("orders")
 }
 
@@ -217,6 +238,8 @@ model RecurringOrderRule {
   ruleItems       RecurringOrderRuleItem[]
   generatedOrders Order[]
 
+  @@index([parentId, isActive])
+  @@index([childId, isActive])
   @@map("recurring_order_rules")
 }
 
@@ -247,6 +270,7 @@ model TeacherOrder {
   user  User             @relation(fields: [userId], references: [id])
   items TeacherOrderItem[]
 
+  @@index([userId, deliveryDate])
   @@map("teacher_orders")
 }
 

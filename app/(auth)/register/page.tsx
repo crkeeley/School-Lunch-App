@@ -3,8 +3,6 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema } from "@/lib/validations";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { z } from "zod";
 
@@ -19,9 +17,9 @@ interface Teacher {
 }
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [error, setError] = useState("");
+  const [registeredEmail, setRegisteredEmail] = useState("");
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
   });
@@ -44,13 +42,29 @@ export default function RegisterPage() {
       return;
     }
 
-    await signIn("credentials", {
-      email: data.email,
-      password: data.password,
-      redirect: false,
-    });
+    setRegisteredEmail(data.email);
+  }
 
-    router.push("/dashboard");
+  if (registeredEmail) {
+    return (
+      <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+        <div className="text-5xl mb-4">📧</div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your inbox!</h2>
+        <p className="text-gray-600 text-sm mb-1">
+          We sent a verification link to
+        </p>
+        <p className="font-semibold text-gray-900 mb-4">{registeredEmail}</p>
+        <p className="text-gray-500 text-sm mb-6">
+          Click the link in the email to activate your account, then sign in. The link expires in 24 hours.
+        </p>
+        <Link
+          href="/login"
+          className="inline-block bg-green-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+        >
+          Go to Sign In
+        </Link>
+      </div>
+    );
   }
 
   // Group teachers by grade
@@ -102,7 +116,7 @@ export default function RegisterPage() {
         </div>
 
         <div className="border-t border-gray-100 pt-4">
-          <p className="text-sm font-semibold text-gray-800 mb-3">Your Child's Information</p>
+          <p className="text-sm font-semibold text-gray-800 mb-3">Your Child&apos;s Information</p>
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>

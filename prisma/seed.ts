@@ -28,7 +28,7 @@ async function main() {
 
   // Create admin user
   const adminHash = await bcrypt.hash("admin123", 12);
-  const admin = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: "admin@maplewood.edu" },
     update: {},
     create: {
@@ -36,6 +36,7 @@ async function main() {
       name: "School Admin",
       passwordHash: adminHash,
       role: "ADMIN",
+      emailVerified: new Date(),
     },
   });
 
@@ -61,6 +62,7 @@ async function main() {
         name: `${t.firstName} ${t.lastName}`,
         passwordHash: teacherHash,
         role: "TEACHER",
+        emailVerified: new Date(),
       },
     });
 

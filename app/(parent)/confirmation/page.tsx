@@ -1,41 +1,107 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
+import { useEffect, useState } from "react";
+import { useCartStore } from "@/lib/cart-store";
 
-export default function ConfirmationPage() {
+function ConfirmationContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const clearCart = useCartStore((s) => s.clearCart);
+  const directSuccess = searchParams.get("order") === "success";
   const paymentIntentId = searchParams.get("payment_intent");
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [success, setSuccess] = useState(directSuccess);
+  const [checking, setChecking] = useState(!directSuccess && Boolean(paymentIntentId));
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    if (!paymentIntentId) {
-      setStatus("error");
-      return;
-    }
-    // Poll orders to confirm payment
-    setTimeout(() => setStatus("success"), 2000);
-  }, [paymentIntentId]);
+    let mounted = true;
 
-  if (status === "loading") {
+    async function validatePaymentIntent() {
+      if (directSuccess) {
+        if (mounted) {
+          setSuccess(true);
+          setChecking(false);
+        }
+        return;
+      }
+
+      if (!paymentIntentId) {
+        if (mounted) {
+          setSuccess(false);
+          setChecking(false);
+        }
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/payment/intent-status?payment_intent=${encodeURIComponent(paymentIntentId)}`, {
+          cache: "no-store",
+        });
+        if (!mounted) return;
+
+        if (!res.ok) {
+          setSuccess(false);
+          setMessage("We could not verify your payment status yet.");
+          setChecking(false);
+          return;
+        }
+
+        const data = await res.json();
+        const status = data?.status;
+
+        if (status === "succeeded") {
+          setSuccess(true);
+          setChecking(false);
+          return;
+        }
+
+        if (status === "processing") {
+          setSuccess(false);
+          setMessage("Your payment is processing. Please refresh this page in a moment.");
+          setChecking(false);
+          return;
+        }
+
+        setSuccess(false);
+        setMessage("Payment was not completed. Please try again.");
+        setChecking(false);
+      } catch {
+        if (!mounted) return;
+        setSuccess(false);
+        setMessage("We could not verify your payment status yet.");
+        setChecking(false);
+      }
+    }
+
+    validatePaymentIntent();
+
+    return () => {
+      mounted = false;
+    };
+  }, [directSuccess, paymentIntentId]);
+
+  useEffect(() => {
+    if (success) clearCart();
+  }, [success, clearCart]);
+
+  if (checking) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4" />
-          <p className="text-gray-600">Confirming your order...</p>
-        </div>
+      <div className="max-w-md mx-auto text-center py-16">
+        <div className="text-6xl mb-4">⏳</div>
+        <h2 className="text-xl font-black text-gray-900 mb-2">Confirming payment...</h2>
+        <p className="text-gray-500 font-medium mb-6">Please wait while we verify your Stripe payment.</p>
       </div>
     );
   }
 
-  if (status === "error") {
+  if (!success) {
     return (
       <div className="max-w-md mx-auto text-center py-16">
-        <div className="text-5xl mb-4">❌</div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Payment Failed</h2>
-        <p className="text-gray-600 mb-6">Something went wrong. Please try again.</p>
-        <Link href="/cart" className="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700">
+        <div className="text-6xl mb-4">❌</div>
+        <h2 className="text-xl font-black text-gray-900 mb-2">Something went wrong</h2>
+        <p className="text-gray-500 font-medium mb-6">{message || "We couldn&apos;t confirm your order. Please try again."}</p>
+        <Link href="/cart" className="btn-bounce inline-block bg-orange-500 text-white px-6 py-3 rounded-2xl font-black hover:bg-orange-600">
           Back to Cart
         </Link>
       </div>
@@ -44,23 +110,49 @@ export default function ConfirmationPage() {
 
   return (
     <div className="max-w-md mx-auto text-center py-16">
-      <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-        <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
+      {/* Success icon */}
+      <div className="relative w-24 h-24 mx-auto mb-6">
+        <div className="w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center">
+          <svg className="w-12 h-12 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <div className="absolute -top-1 -right-1 text-2xl animate-bounce">🎉</div>
       </div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Order Confirmed!</h2>
-      <p className="text-gray-600 mb-6">
-        A confirmation email has been sent to you. Your child's lunch is on its way!
+
+      <h2 className="text-3xl font-black text-gray-900 mb-2">Order Confirmed!</h2>
+      <p className="text-gray-500 font-semibold mb-8 leading-relaxed">
+        Your child&apos;s lunch is all set.<br />
+        A confirmation email has been sent to you.
       </p>
+
+      {/* Fun food decoration */}
+      <div className="flex justify-center gap-3 text-3xl mb-8">
+        🍱🥗🥤🍪
+      </div>
+
       <div className="flex gap-3 justify-center">
-        <Link href="/orders" className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg hover:bg-gray-50">
+        <Link
+          href="/orders"
+          className="border-2 border-gray-200 text-gray-700 px-5 py-3 rounded-2xl font-black hover:bg-gray-50 transition-colors"
+        >
           View Orders
         </Link>
-        <Link href="/dashboard" className="bg-green-600 text-white px-5 py-2.5 rounded-lg hover:bg-green-700">
+        <Link
+          href="/dashboard"
+          className="btn-bounce bg-orange-500 text-white px-5 py-3 rounded-2xl font-black hover:bg-orange-600 transition-colors shadow-md shadow-orange-200"
+        >
           Back to Calendar
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function ConfirmationPage() {
+  return (
+    <Suspense>
+      <ConfirmationContent />
+    </Suspense>
   );
 }

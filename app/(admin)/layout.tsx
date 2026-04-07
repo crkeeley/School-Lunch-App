@@ -7,7 +7,7 @@ import { DropdownAuthMenu } from "@/components/layout/DropdownAuthMenu";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
-  const role = (session.user as any).role;
+  const role = session.user.role;
   if (role !== "ADMIN" && role !== "TEACHER") redirect("/dashboard");
 
   const isAdmin = role === "ADMIN";

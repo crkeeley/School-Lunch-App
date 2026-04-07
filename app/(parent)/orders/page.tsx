@@ -44,7 +44,7 @@ export default function OrdersPage() {
                     {format(parseISO(order.deliveryDate), "EEEE, MMM d, yyyy")}
                   </p>
                   <p className="text-sm text-gray-500">
-                    {order.child.firstName} {order.child.lastName} · {order.teacher.firstName} {order.teacher.lastName}'s class
+                    {order.child.firstName} {order.child.lastName} · {order.teacher.firstName} {order.teacher.lastName}&apos;s class
                   </p>
                 </div>
                 <div className="text-right">
